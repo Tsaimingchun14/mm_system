@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>motion_planner</name>
+  <version>0.0.0</version>
+  <description>
+    Mid-level perception and motion planning for the mobile manipulator.
+    Integrates SAM3 for object tracking, processes depth images to find
+    3D object centers, and manages the execution of complex actions
+    (grasp, hand_over) by coordinating with the joint_controller.
+  </description>
+  <maintainer email="jerry110030014@gapp.nthu.edu.tw">mctsai</maintainer>
+  <license>Apache-2.0</license>
+
+  <depend>rclpy</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>cv_bridge</depend>
+  <depend>message_filters</depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
