@@ -1,0 +1,6 @@
+huggingface-hub
+numpy<2.0.0
+transformers
+torch
+opencv-python-headless
+pyzmq

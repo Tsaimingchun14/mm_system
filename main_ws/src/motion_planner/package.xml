@@ -7,7 +7,7 @@
     Mid-level perception and motion planning for the mobile manipulator.
     Integrates SAM3 for object tracking, processes depth images to find
     3D object centers, and manages the execution of complex actions
-    (grasp, hand_over) by coordinating with the joint_controller.
+    (grasp, hand_over) by coordinating with the joint_planner.
   </description>
   <maintainer email="jerry110030014@gapp.nthu.edu.tw">mctsai</maintainer>
   <license>Apache-2.0</license>
@@ -18,6 +18,7 @@
   <depend>sensor_msgs</depend>
   <depend>cv_bridge</depend>
   <depend>message_filters</depend>
+  <depend>mm_interface</depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

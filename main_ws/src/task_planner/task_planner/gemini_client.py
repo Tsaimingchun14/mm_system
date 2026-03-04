@@ -1,55 +1,19 @@
-"""
-gemini_client.py
-Thin wrapper around the google-genai SDK for the Gemini Robotics-ER model.
-
-Single-call design
-------------------
-One Gemini call receives:
-  * The current RGB camera frame.
-  * The natural-language instruction from the operator.
-
-And returns a *complete* task payload that can be forwarded directly to
-the motion_planner's /motion_task topic:
-
-  {
-    "action": "grasp" | "hand_over",   ← Gemini decides
-    "point":  [x, y],                  ← absolute pixel, Gemini locates
-    "label":  "red cup"                ← human-readable (for logging only)
-  }
-
-Coordinate convention
----------------------
-Gemini returns points as [y_norm, x_norm] normalised to 0-1000.
-This client converts to absolute pixel [x, y] (column, row).
-"""
-
 import json
 import logging
 import re
+import os
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Optional
-
 import numpy as np
-from PIL import Image as PILImage
-
-try:
-    from google import genai
-    from google.genai import types as genai_types
-    _GENAI_AVAILABLE = True
-except ImportError:
-    _GENAI_AVAILABLE = False
+from PIL import Image as PILImage, ImageDraw
+from google import genai
+from google.genai import types as genai_types
+from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Supported actions (must match motion_planner/action_types.py registry)
-# ---------------------------------------------------------------------------
-
 SUPPORTED_ACTIONS = ["grasp", "hand_over"]
-
-# ---------------------------------------------------------------------------
-# Prompt
-# ---------------------------------------------------------------------------
 
 _SYSTEM_PROMPT = """\
 You are a robotic task planner for a mobile manipulator. \
@@ -85,14 +49,12 @@ If the target object is NOT visible in the image, return:
 
 _USER_TEMPLATE = "Instruction: {instruction}"
 
-
 @dataclass
 class TaskDecision:
     """Structured result from GeminiRoboticsClient.decide_task()."""
     action: str                 # e.g. "grasp"
     point: list[float]          # [x_px, y_px] in absolute pixel coords
     label: str                  # e.g. "red cup"  (for logging / debugging)
-
 
 class GeminiRoboticsClient:
     """
@@ -110,11 +72,6 @@ class GeminiRoboticsClient:
     MODEL = "gemini-robotics-er-1.5-preview"
 
     def __init__(self, api_key: str, model: Optional[str] = None):
-        if not _GENAI_AVAILABLE:
-            raise ImportError(
-                "The 'google-genai' package is required. "
-                "Install it with: pip install google-genai"
-            )
         self._model_name = model or self.MODEL
         self._client = genai.Client(api_key=api_key)
         self._system_prompt = _SYSTEM_PROMPT.format(
@@ -122,32 +79,11 @@ class GeminiRoboticsClient:
         )
         logger.info("GeminiRoboticsClient ready (model=%s)", self._model_name)
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
     def decide_task(
         self,
         image_rgb: np.ndarray,
         instruction: str,
     ) -> Optional[TaskDecision]:
-        """
-        Given the camera frame and a natural-language instruction, ask Gemini
-        to decide which action to perform and where the target object is.
-
-        Parameters
-        ----------
-        image_rgb : np.ndarray
-            H×W×3 uint8 RGB image (from cv_bridge).
-        instruction : str
-            Operator instruction, e.g. ``"grasp the red cup"``.
-
-        Returns
-        -------
-        TaskDecision | None
-            Populated TaskDecision on success, ``None`` on any failure
-            (Gemini API error, object not found, invalid response, etc.).
-        """
         h, w = image_rgb.shape[:2]
         pil_image = PILImage.fromarray(image_rgb)
         user_text = _USER_TEMPLATE.format(instruction=instruction)
@@ -162,21 +98,43 @@ class GeminiRoboticsClient:
                 config=genai_types.GenerateContentConfig(
                     system_instruction=self._system_prompt,
                     temperature=0.0,      # deterministic / no hallucination
-                    max_output_tokens=256,
+                    response_mime_type="application/json",
+                    max_output_tokens=1024,
                 ),
             )
         except Exception as exc:
             logger.error("Gemini API call failed: %s", exc)
             return None
 
-        raw_text = response.text.strip()
+        raw_text = (getattr(response, "text", None) or "").strip()
+        if not raw_text:
+            # Some responses have no direct `.text`; try candidates/parts.
+            try:
+                candidates = getattr(response, "candidates", None) or []
+                text_parts = []
+                for cand in candidates:
+                    content = getattr(cand, "content", None)
+                    parts = getattr(content, "parts", None) if content else None
+                    if not parts:
+                        continue
+                    for part in parts:
+                        part_text = getattr(part, "text", None)
+                        if part_text:
+                            text_parts.append(part_text)
+                raw_text = "\n".join(text_parts).strip()
+            except Exception:
+                raw_text = ""
+
+        if not raw_text:
+            logger.error(
+                "Gemini returned no text content. response=%r",
+                response,
+            )
+            return None
+
         logger.debug("Gemini raw response: %s", raw_text)
 
         return self._parse_response(raw_text, image_width=w, image_height=h)
-
-    # ------------------------------------------------------------------
-    # Internals
-    # ------------------------------------------------------------------
 
     def _parse_response(
         self,
@@ -244,3 +202,53 @@ class GeminiRoboticsClient:
             action, label, x_px, y_px,
         )
         return TaskDecision(action=action, point=[x_px, y_px], label=label)
+
+if __name__ == "__main__":
+    import os
+    from dotenv import load_dotenv
+
+    pkg_dir = Path(__file__).resolve().parent
+    ws_dir = pkg_dir.parents[2]
+    load_dotenv(ws_dir / ".env")
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        logger.error("GOOGLE_API_KEY not set in environment.")
+    else:
+        client = GeminiRoboticsClient(api_key=api_key)
+        image_path = pkg_dir / "water_bottle.jpg"
+        if not image_path.exists():
+            raise FileNotFoundError(f"Image not found: {image_path}")
+
+        instruction = "grasp the water bottle"
+        image_rgb = np.array(PILImage.open(image_path).convert("RGB"))
+        h, w = image_rgb.shape[:2]
+        pil_image = PILImage.fromarray(image_rgb)
+
+        decision = client.decide_task(image_rgb=image_rgb, instruction=instruction)
+
+        print("instruction:", instruction)
+        print("image:", image_path)
+        if decision is None:
+            print("parsed_decision: None")
+        else:
+            x_px, y_px = decision.point
+            y_norm = int(round(y_px / h * 1000.0))
+            x_norm = int(round(x_px / w * 1000.0))
+
+            print("parsed_output:")
+            print("  action:", decision.action)
+            print("  label:", decision.label)
+            print(f"  point_px [x, y]: [{x_px:.1f}, {y_px:.1f}]")
+            print(f"  point_norm [y, x]: [{y_norm}, {x_norm}]")
+            print(f"  image_size [w, h]: [{w}, {h}]")
+
+            vis = pil_image.copy()
+            draw = ImageDraw.Draw(vis)
+            r = 10
+            draw.ellipse((x_px - r, y_px - r, x_px + r, y_px + r), outline="red", width=3)
+            draw.line((x_px - 20, y_px, x_px + 20, y_px), fill="red", width=2)
+            draw.line((x_px, y_px - 20, x_px, y_px + 20), fill="red", width=2)
+            draw.text((10, 10), f"{decision.action} | {decision.label}", fill="red")
+            out_path = pkg_dir / "water_bottle_gemini_vis.jpg"
+            vis.save(out_path)
+            print("saved_visualization:", out_path)

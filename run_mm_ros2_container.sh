@@ -14,6 +14,7 @@ docker run -it --rm \
     --network host \
     --gpus all \
     --privileged \
+    -v "${ROOT_DIR}/tmp:/tmp" \
     -e DISPLAY=$DISPLAY \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
     -v "${ROOT_DIR}/main_ws:/workspace/main_ws" \
