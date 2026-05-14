@@ -7,11 +7,12 @@ ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 docker build -t "${IMAGE_NAME}" -f "${DOCKERFILE}" .
 
-docker run -it --rm \
+docker run -d \
     --name "${CONTAINER_NAME}" \
     --network host \
     --gpus all \
     --privileged \
+    -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
     -v "${ROOT_DIR}/main_ws:/workspace/main_ws" \
     -v "${ROOT_DIR}/piper_ros:/workspace/piper_ros" \
     -v "/workspace/main_ws/build" \
@@ -21,4 +22,5 @@ docker run -it --rm \
     -v "/workspace/main_ws/log" \
     -v "/workspace/piper_ros/log" \
     -v "${ROOT_DIR}/start_mm_tmux.sh:/workspace/start_mm_tmux.sh" \
-    "${IMAGE_NAME}" 
+    "${IMAGE_NAME}" \
+    bash /workspace/start_mm_tmux.sh

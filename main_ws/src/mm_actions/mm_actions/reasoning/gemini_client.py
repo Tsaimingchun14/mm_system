@@ -10,10 +10,11 @@ from PIL import Image as PILImage, ImageDraw
 from google import genai
 from google.genai import types as genai_types
 from dotenv import load_dotenv
+import rerun as rr
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_ACTIONS = ["grasp", "handover"]
+SUPPORTED_ACTIONS = ["grasp", "handover", "place"]
 
 _SYSTEM_PROMPT = """\
 You are a robotic task planner for a mobile manipulator. \
@@ -25,12 +26,22 @@ You MUST:
 1. Decide the correct ACTION from this fixed list: {actions}.
    - Use "grasp" when the robot should pick up / grab an object.
    - Use "handover" when the robot should deliver / pass an object to a person.
-2. Visually locate the PRIMARY TARGET OBJECT mentioned in the instruction.
-3. Estimate the SINGLE BEST PIXEL to use as the grasp/approach centre for that object.
+   - Use "place" when the robot should put down / place / set an object at a location.
+2. Visually locate the PRIMARY TARGET in the image:
+   - If action="grasp": the object mentioned in the instruction.
+   - If action="handover": a person's receiving hand / open palm (do NOT require the named object to be visible).
+   - If action="place": the intended placement point, surface, container, or location.
+     If the instruction only names the object to place, such as "place the pringles",
+     assume the object is already held or is the item being manipulated; do NOT require
+     that object to be visible. Use the best visible flat support surface, table,
+     countertop, shelf, tray, bin, or open container as the placement target.
+3. Estimate the SINGLE BEST PIXEL to use as the grasp/approach centre for that target.
    - For grasping: choose a point near the object's centroid on a stable, grippable part,
      with clear approach space (avoid edges, thin tips, or occluded areas).
-   - For handover: choose a point below the person's chin as the
-     approach target for passing the object.
+   - For handover: choose a point near the centre of the open palm that is safe to approach.
+   - For placing: choose a reachable-looking clear point near the centre of the target
+     placement area or surface where the object should be set down. If no explicit
+     destination was named, choose a clear point on the most suitable visible support surface.
    
 Output ONLY valid JSON (no markdown, no extra text) in exactly this schema:
 {{
@@ -42,7 +53,10 @@ Output ONLY valid JSON (no markdown, no extra text) in exactly this schema:
 Where y_norm and x_norm are integers in [0, 1000], normalized so that
 (0, 0) = top-left corner and (1000, 1000) = bottom-right corner of the image.
 
-If the target object is NOT visible in the image, return:
+For place instructions, "target" means the placement destination, not necessarily the
+named object being placed.
+
+If the target is NOT visible in the image, return:
 {{
   "action": null,
   "point": null,
@@ -72,7 +86,7 @@ class GeminiRoboticsClient:
         Gemini model identifier. Defaults to ``gemini-robotics-er-1.5-preview``.
     """
 
-    MODEL = "gemini-robotics-er-1.5-preview"
+    MODEL = "gemini-robotics-er-1.6-preview"
 
     def __init__(self, api_key: str, model: Optional[str] = None):
         self._model_name = model or self.MODEL
@@ -91,6 +105,7 @@ class GeminiRoboticsClient:
         pil_image = PILImage.fromarray(image_rgb)
         user_text = _USER_TEMPLATE.format(instruction=instruction)
 
+        rr.log("gemini/image/rgb", rr.Image(image_rgb))
         try:
             response = self._client.models.generate_content(
                 model=self._model_name,
@@ -110,6 +125,7 @@ class GeminiRoboticsClient:
             return None
 
         raw_text = (getattr(response, "text", None) or "").strip()
+        print("Gemini raw text response:", raw_text)
         if not raw_text:
             # Some responses have no direct `.text`; try candidates/parts.
             try:

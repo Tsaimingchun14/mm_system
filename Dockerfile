@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     ros-${ROS_DISTRO}-controller-manager \
     ros-${ROS_DISTRO}-joint-state-publisher-gui \
     ros-${ROS_DISTRO}-joint-state-publisher \
+    ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
     tmux \
     can-utils \
     ethtool \

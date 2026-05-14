@@ -14,7 +14,7 @@ setup(
     zip_safe=True,
     maintainer='acm',
     maintainer_email='acm@todo.local',
-    description='Minimal action servers for grasp and handover.',
+    description='Minimal action servers for grasp, handover, and place.',
     license='Apache-2.0',
     entry_points={
         'console_scripts': [

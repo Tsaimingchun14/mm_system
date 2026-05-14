@@ -105,6 +105,8 @@ class MmActionsNode(Node):
         self.arm_cmd_pub.publish(msg)
 
     def goal_cb(self, _goal_request: TaskCommand.Goal) -> GoalResponse:
+
+        print("recieved action")
         with self._busy_lock:
             if self._busy:
                 self.get_logger().warn('Rejecting goal: another action is running')
@@ -123,6 +125,7 @@ class MmActionsNode(Node):
 
     def execute_cb(self, goal_handle) -> TaskCommand.Result:
 
+        print("executing action")
         action_name = None
         image = self.get_image()
         if image is None or image.get("rgb") is None:

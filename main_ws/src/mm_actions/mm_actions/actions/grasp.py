@@ -73,7 +73,8 @@ class GraspAction(BaseAction):
         self._publish_arm_cmd(joint_state[:6], gripper=0.06)
         time.sleep(1.0)
 
-        home_joint_state = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.06]
+        home_joint_state = [0.0, 0.2, -0.6, 0.0, 0.8, 0.0, 0.06]
+        #home_joint_state = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.06]
         self.move_arm_to_joint_state(home_joint_state)
 
         return True, "grasp complete"
