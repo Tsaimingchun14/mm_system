@@ -89,7 +89,7 @@ class GraspAction(BaseAction):
         
         return True, "grasp complete"
 
-    def _close_until_tight(self, start=0.10, stop=0.04, rate=0.1, dt=0.05):
+    def _close_until_tight(self, start=0.10, stop=0.05, rate=0.1, dt=0.05):
         """Close gripper at `rate` (m/s) until force sensor detects a tight grip.
         Returns (gripped: bool, final_width: float)."""
         g = start
