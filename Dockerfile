@@ -15,6 +15,8 @@ RUN apt-get update && apt-get install -y \
     can-utils \
     ethtool \
     iproute2 \
+    #for force sensor
+    python3-serial \
     ros-${ROS_DISTRO}-realsense2-camera \
     ros-${ROS_DISTRO}-realsense2-description \
     && rm -rf /var/lib/apt/lists/*

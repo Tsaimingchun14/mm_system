@@ -22,5 +22,7 @@ docker run -d \
     -v "/workspace/main_ws/log" \
     -v "/workspace/piper_ros/log" \
     -v "${ROOT_DIR}/start_mm_tmux.sh:/workspace/start_mm_tmux.sh" \
+    -v /dev:/dev \
+    -v /run/udev:/run/udev:ro \
     "${IMAGE_NAME}" \
     bash /workspace/start_mm_tmux.sh

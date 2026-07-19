@@ -13,11 +13,13 @@ class BaseAction:
     INTEGRATION_DT = 0.01
     POSE_ERROR_THRESHOLD = 0.001
 
-    def __init__(self, get_image, get_joint_state, publish_arm_cmd, image=None, point=None, joint_state_at_image=None) -> None:
+    def __init__(self, get_image, get_joint_state, publish_arm_cmd, is_holding_tightly, use_force_grasp, image=None, point=None, joint_state_at_image=None) -> None:
         self._get_image = get_image
         self._get_joint_state = get_joint_state
         self._publish_arm_cmd = publish_arm_cmd
-        self._image = image
+        self._is_holding_tightly = is_holding_tightly
+        self._use_force_grasp = use_force_grasp
+        self._image = image 
         self._point = point
         self._joint_state_at_image = joint_state_at_image
         self._robot = rtb.models.Piper()
@@ -29,7 +31,6 @@ class BaseAction:
 
         Args:
             target_pose: [x, y, z, qw, qx, qy, qz].
-            gripper_width: Gripper width to command during motion.
             timeout_s: Max time to attempt before aborting.
 
         Returns:

@@ -10,7 +10,7 @@ import rclpy
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
-from std_msgs.msg import String
+from std_msgs.msg import String, Float32MultiArray 
 from sensor_msgs.msg import JointState, Image, CameraInfo
 import message_filters
 import rerun as rr
@@ -30,9 +30,13 @@ class MmActionsNode(Node):
         self._latest_image = None
         self._latest_joint_state = None
         self._gemini_client: None
+        self._latest_voltages = [0.0] * 5
+        self.voltage_threshold = 0.5
 
         api_key = os.getenv("GOOGLE_API_KEY")
         self._gemini_client = GeminiRoboticsClient(api_key=api_key)
+        self.declare_parameter('use_force_grasp', True)
+        self.use_force_grasp = self.get_parameter('use_force_grasp').value
 
         self.image_sub = message_filters.Subscriber(self, Image, '/camera/color/image_raw', qos_profile=10)
         self.depth_sub = message_filters.Subscriber(self, Image, '/camera/aligned_depth_to_color/image_raw', qos_profile=10)
@@ -49,6 +53,12 @@ class MmActionsNode(Node):
             'joint_states_feedback',
             self._arm_joint_state_cb,
             1
+        )
+        self.force_sub = self.create_subscription(
+            Float32MultiArray,
+            '/force_sensor_topic',
+            self._force_cb,
+            10
         )
 
         self.arm_cmd_pub = self.create_publisher(JointState, '/joint_states', 10)
@@ -81,11 +91,18 @@ class MmActionsNode(Node):
     def _arm_joint_state_cb(self, joint_state_msg):
         self._latest_joint_state = joint_state_msg.position
 
+    def _force_cb(self, msg):
+        self._latest_voltages = list(msg.data)
+
     def get_image(self) -> Dict:
         return self._latest_image
     
     def get_joint_state(self) -> String:
         return self._latest_joint_state
+
+    def is_holding_tightly(self) -> bool:
+        v = self._latest_voltages
+        return v[-1] >= self.voltage_threshold or v[-2] >= self.voltage_threshold
 
     def publish_arm_cmd(self, q: List[float], gripper: float = None):
         """Publish an arm joint command with a gripper position.
@@ -165,6 +182,8 @@ class MmActionsNode(Node):
                 self.get_image,
                 self.get_joint_state,
                 self.publish_arm_cmd,
+                self.is_holding_tightly,
+                self.use_force_grasp,
                 image,
                 decision.point,
                 joint_state_at_image,
