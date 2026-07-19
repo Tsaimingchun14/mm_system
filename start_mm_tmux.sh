@@ -44,7 +44,7 @@ if ! tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
   tmux send-keys -t "$SESSION_NAME":0.0 "cd $PIPER_WS" C-m
   tmux send-keys -t "$SESSION_NAME":0.0 "source $PIPER_WS/install/setup.bash" C-m
   tmux send-keys -t "$SESSION_NAME":0.0 "bash find_all_can_port.sh" C-m
-  tmux send-keys -t "$SESSION_NAME":0.0 "bash can_activate.sh can_piper 1000000 \"1-4.1:1.0\"" C-m
+  tmux send-keys -t "$SESSION_NAME":0.0 "bash can_activate.sh can0 1000000 \"1-4.1:1.0\"" C-m
   tmux send-keys -t "$SESSION_NAME":0.0 "ros2 launch piper start_single_piper.launch.py" C-m
 
   # Pane 1: camera startup

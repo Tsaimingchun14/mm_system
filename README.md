@@ -14,7 +14,7 @@ or manually run
 ```
 # 1. piper startup
 bash find_all_can_port.sh
-bash can_activate.sh can_piper 1000000 "1-4.2.2:1.0"
+bash can_activate.sh can_piper 1000000 "1-4.1:1.0"
 ros2 launch piper start_single_piper.launch.py
 
 # 2. camera startup

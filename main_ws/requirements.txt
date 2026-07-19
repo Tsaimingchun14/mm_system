@@ -4,8 +4,8 @@ numpy==1.26.4
 pyyaml==6.0.3
 qpsolvers==4.8.2
 quadprog==0.1.13
-roboticstoolbox-python @ git+https://github.com/Tsaimingchun14/robotics-toolbox-python.git@6601137adde87126a415e87755a263a567e6f7bf
-rtb-data @ git+https://github.com/Tsaimingchun14/robotics-toolbox-python.git@6601137adde87126a415e87755a263a567e6f7bf#subdirectory=rtb-data
+roboticstoolbox-python @ git+https://github.com/Tsaimingchun14/robotics-toolbox-python.git@8d8c0c30f42e290491c242e1a52aea075ee43fe7
+rtb-data @ git+https://github.com/Tsaimingchun14/robotics-toolbox-python.git@8d8c0c30f42e290491c242e1a52aea075ee43fe7#subdirectory=rtb-data
 scipy==1.15.3
 spatialgeometry==1.1.0
 spatialmath-python==1.1.15
