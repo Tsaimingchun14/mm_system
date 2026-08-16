@@ -11,6 +11,10 @@ from mm_actions.perception.utils import camera_2d_to_3d
 
 
 class GraspAction(BaseAction):
+    # Looser than the close-until-tight threshold (voltage_threshold=0.5 in mm_actions_node):
+    # voltage sags a bit once the gripper stops closing, but should stay above this while holding.
+    HOLD_CHECK_THRESHOLD = 0.01
+
     def run(self):
         rgb = self._image.get("rgb")
         depth = self._image.get("depth")
@@ -63,6 +67,7 @@ class GraspAction(BaseAction):
             return False, "grasp aborted: IK failed for target point"
 
         self.set_gripper_width(0.1) # open gripper before moving to target pose
+        time.sleep(0.5)  # wait for gripper to open
         success, message = self.move_arm_to_pose(target_pose)
         if not success:
             return False, message
@@ -78,8 +83,8 @@ class GraspAction(BaseAction):
             home_joint_state = [0.0, 0.2, -0.6, 0.0, 0.8, 0.0, grip_width]
             self.move_arm_to_joint_state(home_joint_state)
 
-             #final check if object is held tightly
-            if not self._is_holding_tightly():
+             #final check if object is held tightly (looser threshold than while closing)
+            if not self._is_holding_tightly(threshold=self.HOLD_CHECK_THRESHOLD):
                 return False, "grasp failed: object not held tightly after grasp"
         else :
             self.set_gripper_width(grip_width)

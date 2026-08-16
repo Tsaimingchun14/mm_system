@@ -93,6 +93,8 @@ class MmActionsNode(Node):
 
     def _force_cb(self, msg):
         self._latest_voltages = list(msg.data)
+        rr.log("gripper_force/left", rr.Scalar(self._latest_voltages[-2]))
+        rr.log("gripper_force/right", rr.Scalar(self._latest_voltages[-1]))
 
     def get_image(self) -> Dict:
         return self._latest_image
@@ -100,9 +102,10 @@ class MmActionsNode(Node):
     def get_joint_state(self) -> String:
         return self._latest_joint_state
 
-    def is_holding_tightly(self) -> bool:
+    def is_holding_tightly(self, threshold: float = None) -> bool:
+        t = self.voltage_threshold if threshold is None else threshold
         v = self._latest_voltages
-        return v[-1] >= self.voltage_threshold or v[-2] >= self.voltage_threshold
+        return v[-1] >= t or v[-2] >= t
 
     def publish_arm_cmd(self, q: List[float], gripper: float = None):
         """Publish an arm joint command with a gripper position.
