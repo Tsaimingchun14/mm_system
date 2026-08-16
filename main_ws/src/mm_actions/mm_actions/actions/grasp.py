@@ -6,7 +6,6 @@ import time
 
 from mm_actions.actions.base_action import BaseAction
 from mm_actions.logging.loggin import log_frame, overlay_point_rgb
-from mm_actions.motion.piper_kinematic import find_reachable_pose
 from mm_actions.perception.utils import camera_2d_to_3d
 
 
@@ -62,13 +61,9 @@ class GraspAction(BaseAction):
         # Temporary hack (originally grasping higher than point on picture)
         point_base[2] -= 0.03
 
-        target_pose = find_reachable_pose(self._robot, q, point_base)
-        if target_pose is None:
-            return False, "grasp aborted: IK failed for target point"
-
         self.set_gripper_width(0.1) # open gripper before moving to target pose
         time.sleep(0.5)  # wait for gripper to open
-        success, message = self.move_arm_to_pose(target_pose)
+        success, message = self.move_to_point_with_waypoint(point_base, q)
         if not success:
             return False, message
 

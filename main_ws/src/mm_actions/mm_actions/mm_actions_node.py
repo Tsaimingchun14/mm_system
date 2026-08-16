@@ -3,6 +3,8 @@ import os
 import pkgutil
 import threading
 from typing import List, Dict
+
+import numpy as np
 from cv_bridge import CvBridge
 import logging
 
@@ -10,8 +12,11 @@ import rclpy
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
-from std_msgs.msg import String, Float32MultiArray 
+from rclpy.time import Time
+from std_msgs.msg import String, Float32MultiArray
 from sensor_msgs.msg import JointState, Image, CameraInfo
+from geometry_msgs.msg import Twist
+from tf2_ros import Buffer, TransformException, TransformListener
 import message_filters
 import rerun as rr
 
@@ -32,11 +37,16 @@ class MmActionsNode(Node):
         self._gemini_client: None
         self._latest_voltages = [0.0] * 5
         self.voltage_threshold = 0.5
+        self._base_cmd_pub = None
+        self._tf_buffer = None
+        self._tf_listener = None
 
         api_key = os.getenv("GOOGLE_API_KEY")
         self._gemini_client = GeminiRoboticsClient(api_key=api_key)
         self.declare_parameter('use_force_grasp', True)
         self.use_force_grasp = self.get_parameter('use_force_grasp').value
+        self.declare_parameter('whole_body', False)
+        self._whole_body_enabled = bool(self.get_parameter('whole_body').value)
 
         self.image_sub = message_filters.Subscriber(self, Image, '/camera/color/image_raw', qos_profile=10)
         self.depth_sub = message_filters.Subscriber(self, Image, '/camera/aligned_depth_to_color/image_raw', qos_profile=10)
@@ -62,6 +72,11 @@ class MmActionsNode(Node):
         )
 
         self.arm_cmd_pub = self.create_publisher(JointState, '/joint_states', 10)
+        if self._whole_body_enabled:
+            self._base_cmd_pub = self.create_publisher(Twist, '/kachaka/manual_control/cmd_vel', 10)
+            self._tf_buffer = Buffer()
+            self._tf_listener = TransformListener(self._tf_buffer, self)
+            self.get_logger().warn('whole_body:=true - whole-body base+arm servo enabled')
 
         self._dispatch = self._load_actions()
 
@@ -123,6 +138,46 @@ class MmActionsNode(Node):
             msg.name += ["gripper"]
         msg.header.stamp = self.get_clock().now().to_msg()
         self.arm_cmd_pub.publish(msg)
+
+    def publish_base_cmd(self, yaw_rate: float, forward_velocity: float):
+        if self._base_cmd_pub is None:
+            return
+        msg = Twist()
+        msg.linear.x = float(forward_velocity)
+        msg.angular.z = float(yaw_rate)
+        self._base_cmd_pub.publish(msg)
+
+    @staticmethod
+    def _yaw_from_quaternion(q):
+        x = float(q.x)
+        y = float(q.y)
+        z = float(q.z)
+        w = float(q.w)
+        siny_cosp = 2.0 * (w * z + x * y)
+        cosy_cosp = 1.0 - 2.0 * (y * y + z * z)
+        return float(np.arctan2(siny_cosp, cosy_cosp))
+
+    def get_base_pose(self):
+        if self._tf_buffer is None:
+            return None
+        try:
+            transform = self._tf_buffer.lookup_transform(
+                'odom',
+                'base_footprint',
+                Time(),
+            )
+        except TransformException as exc:
+            self.get_logger().warn(f'base pose lookup failed: {exc}')
+            return None
+
+        translation = transform.transform.translation
+        rotation = transform.transform.rotation
+        return np.array([
+            float(translation.x),
+            float(translation.y),
+            self._yaw_from_quaternion(rotation),
+        ], dtype=float)
+
 
     def goal_cb(self, _goal_request: TaskCommand.Goal) -> GoalResponse:
 
@@ -190,6 +245,9 @@ class MmActionsNode(Node):
                 image,
                 decision.point,
                 joint_state_at_image,
+                publish_base_cmd=self.publish_base_cmd,
+                get_base_pose=self.get_base_pose,
+                whole_body=self._whole_body_enabled,
             )
             success, message = action.run()
             result = TaskCommand.Result()

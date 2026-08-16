@@ -6,7 +6,6 @@ import rerun as rr
 
 from mm_actions.actions.base_action import BaseAction
 from mm_actions.logging.loggin import log_frame, overlay_point_rgb
-from mm_actions.motion.piper_kinematic import find_reachable_pose
 from mm_actions.perception.utils import camera_2d_to_3d
 
 class HandoverAction(BaseAction):
@@ -56,11 +55,7 @@ class HandoverAction(BaseAction):
         )
 
         q = np.array(joint_state_for_cam[:6], dtype=float)
-        target_pose = find_reachable_pose(self._robot, q, point_base)
-        if target_pose is None:
-            return False, "handover aborted: IK failed for target point"
-
-        success, message = self.move_arm_to_pose(target_pose)
+        success, message = self.move_to_point_with_waypoint(point_base, q)
         if not success:
             return False, message
 

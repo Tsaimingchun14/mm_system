@@ -6,6 +6,7 @@ MM_ROOT="/workspace"
 MM_WS="/workspace/main_ws"
 PIPER_WS="/workspace/piper_ros"
 USE_FORCE_GRASP=${USE_FORCE_GRASP:-true}
+WHOLE_BODY=${WHOLE_BODY:-false}
 
 if [[ ! -f "$HOME/.tmux.conf" ]]; then
   cat > "$HOME/.tmux.conf" << 'TMUXCONF'
@@ -57,7 +58,7 @@ if ! tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
   tmux send-keys -t "$SESSION_NAME":0.2 "source $MM_WS/install/setup.bash" C-m
   tmux send-keys -t "$SESSION_NAME":0.2 "set -a" C-m
   tmux send-keys -t "$SESSION_NAME":0.2 "source $MM_WS/.env" C-m
-  tmux send-keys -t "$SESSION_NAME":0.2 "ros2 run mm_actions mm_actions_node --ros-args -p use_force_grasp:=$USE_FORCE_GRASP" C-m
+  tmux send-keys -t "$SESSION_NAME":0.2 "ros2 run mm_actions mm_actions_node --ros-args -p use_force_grasp:=$USE_FORCE_GRASP -p whole_body:=$WHOLE_BODY" C-m
 
   # Pane 3: sourced, ready
   tmux send-keys -t "$SESSION_NAME":0.3 "source $PIPER_WS/install/setup.bash" C-m
